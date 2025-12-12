@@ -1,4 +1,5 @@
-{
+const workflow = {
+  {
   "6": {
     "_meta": {
       "title": "CLIP Text Encode (Positive Prompt)"
@@ -250,3 +251,4 @@
     "class_type": "LoadImage"
   }
 }
+};
