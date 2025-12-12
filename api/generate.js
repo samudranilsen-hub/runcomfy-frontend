@@ -1,10 +1,17 @@
-import workflow from "../workflow.json" assert { type: "json" };
-
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "POST only" });
+  }
 
   const { prompt } = req.body || {};
-  if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+  if (!prompt) {
+    return res.status(400).json({ error: "Missing prompt" });
+  }
+
+  // ⬇️ PASTE YOUR WORKFLOW JSON HERE
+  const workflow = {
+    /* PASTE THE FULL workflow.json CONTENT HERE */
+  };
 
   const response = await fetch("https://api.runcomfy.com/v1/run", {
     method: "POST",
@@ -16,8 +23,10 @@ export default async function handler(req, res) {
       deployment_id: "c9067009-10ce-4f43-b977-79ff5dc30337",
       workflow,
       inputs: {
-        "6": {                      // node 6 = Positive Prompt in your workflow :contentReference[oaicite:1]{index=1}
-          inputs: { text: prompt }
+        "6": {
+          inputs: {
+            text: prompt
+          }
         }
       }
     })
