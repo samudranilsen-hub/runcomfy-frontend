@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RunComfy Turnaround</title>
+</head>
+<body style="font-family: system-ui; max-width: 720px; margin: 40px auto; padding: 0 16px;">
+  <h2>RunComfy Turnaround Generator</h2>
+
+  <label>Prompt</label><br/>
+  <textarea id="prompt" rows="6" style="width:100%; margin-top:8px;">
+create turnaround sheet of this exact character, 5 full-body poses on pure white background...
+  </textarea>
+
+  <div style="margin-top:12px;">
+    <button onclick="generate()" style="padding:10px 14px; cursor:pointer;">Generate</button>
+  </div>
+
+  <pre id="status" style="white-space: pre-wrap; margin-top:16px;"></pre>
+
+  <script>
+    async function generate() {
+      const prompt = document.getElementById("prompt").value;
+      document.getElementById("status").textContent = "Sending request...";
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+      document.getElementById("status").textContent = JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
