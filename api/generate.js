@@ -1,67 +1,40 @@
-export const config = {
-  runtime: "edge"
-};
-
-const BASE = "https://api.runcomfy.net";
-const DEPLOYMENT_ID = "c9067009-10ce-4f43-b977-79ff5dc30337";
-
-export default async function handler(request) {
+export default async function handler(req, res) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("image");
-    const prompt = formData.get("prompt");
+    const { prompt, image } = req.body;
 
-    if (!file || !prompt) {
-      return new Response(
-        JSON.stringify({ error: "Missing image or prompt" }),
-        { status: 400 }
-      );
+    if (!prompt || !image) {
+      return res.status(400).json({ error: "Missing prompt or image" });
     }
 
-    // 1️⃣ Upload image to RunComfy
-    const uploadForm = new FormData();
-    uploadForm.append("file", file, file.name);
+    const workflow = {
+      overrides: {
+        "6": { inputs: { text: prompt } },
 
-    const uploadRes = await fetch(`${BASE}/prod/v1/assets`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RUNCOMFY_API_KEY}`
-      },
-      body: uploadForm
-    });
+        // Your LoadImage node (194)
+        "194": {
+          inputs: {
+            image: `data:image/png;base64,${image}`
+          }
+        }
+      }
+    };
 
-    const uploadData = await uploadRes.json();
-    if (!uploadRes.ok) {
-      return new Response(JSON.stringify(uploadData), { status: 500 });
-    }
-
-    const imagePath = uploadData.path;
-
-    // 2️⃣ Start inference
-    const inferRes = await fetch(
-      `${BASE}/prod/v1/deployments/${DEPLOYMENT_ID}/inference`,
+    const resp = await fetch(
+      "https://api.runcomfy.net/prod/v1/deployments/c9067009-10ce-4f43-b977-79ff5dc30337/inference",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.RUNCOMFY_API_KEY}`,
+          "Authorization": `Bearer ${process.env.RUNCOMFY_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          overrides: {
-            "6": { inputs: { text: prompt } },
-            "194": { inputs: { image: imagePath } }
-          }
-        })
+        body: JSON.stringify(workflow)
       }
     );
 
-    const inferData = await inferRes.json();
-    return new Response(JSON.stringify(inferData), { status: 200 });
+    const data = await resp.json();
+    res.status(200).json(data);
 
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500 }
-    );
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 }
