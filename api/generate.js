@@ -1,47 +1,47 @@
+const BASE = "https://api.runcomfy.net";
 const DEPLOYMENT_ID = "c9067009-10ce-4f43-b977-79ff5dc30337";
-const BASE_URL = "https://api.runcomfy.net";
+
+export const config = { api: { bodyParser: false } };
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "POST only" });
-    }
+    const form = await req.formData();
+    const file = form.get("image");
+    const prompt = form.get("prompt");
 
-    const { prompt } = req.body || {};
-    if (!prompt) {
-      return res.status(400).json({ error: "Missing prompt" });
-    }
+    const uploadForm = new FormData();
+    uploadForm.append("file", file, file.name);
 
-    const url = `${BASE_URL}/prod/v1/deployments/${DEPLOYMENT_ID}/inference`;
-
-    // Use cloud-saved workflow; override node 6 text (your Positive Prompt node)
-    const body = {
-      overrides: {
-        "6": {
-          inputs: { text: prompt }
-        }
-      }
-    };
-
-    const resp = await fetch(url, {
+    const uploadRes = await fetch(`${BASE}/prod/v1/assets`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RUNCOMFY_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
+      headers: { Authorization: `Bearer ${process.env.RUNCOMFY_API_KEY}` },
+      body: uploadForm
     });
 
-    const data = await resp.json();
+    const uploadData = await uploadRes.json();
+    const imagePath = uploadData.path;
 
-    // Forward errors clearly
-    if (!resp.ok) {
-      return res.status(resp.status).json({ error: "RunComfy error", details: data });
-    }
+    const inferRes = await fetch(
+      `${BASE}/prod/v1/deployments/${DEPLOYMENT_ID}/inference`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.RUNCOMFY_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          overrides: {
+            "6": { inputs: { text: prompt } },
+            "194": { inputs: { image: imagePath } }
+          }
+        })
+      }
+    );
 
-    // data contains request_id + status_url/result_url per docs
-    return res.status(200).json(data);
+    const inferData = await inferRes.json();
+    res.status(200).json(inferData);
+
   } catch (e) {
-    return res.status(500).json({ error: "Server error", details: String(e) });
+    res.status(500).json({ error: String(e) });
   }
 }
