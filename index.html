@@ -1,38 +1,164 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RunComfy Turnaround</title>
+  <meta charset="UTF-8" />
+  <title>RunComfy Character Sheet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b0b0b;
+      color: #ffffff;
+    }
+
+    .app {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    header {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #151515;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      background: #0b0b0b;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      padding: 10px;
+      resize: vertical;
+    }
+
+    input[type="file"] {
+      color: #ccc;
+      margin-top: 8px;
+    }
+
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 12px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #4338ca;
+    }
+
+    .output-box {
+      height: 100%;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #333;
+      border-radius: 10px;
+      color: #777;
+      text-align: center;
+    }
+
+    .output-box img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #aaa;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 800px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
-<body style="font-family: system-ui; max-width: 720px; margin: 40px auto; padding: 0 16px;">
-  <h2>RunComfy Turnaround Generator</h2>
 
-  <label>Prompt</label><br/>
-  <textarea id="prompt" rows="6" style="width:100%; margin-top:8px;">
-create turnaround sheet of this exact character, 5 full-body poses on pure white background...
-  </textarea>
+<body>
+  <div class="app">
+    <header>RunComfy · Character Sheet Generator</header>
 
-  <div style="margin-top:12px;">
-    <button onclick="generate()" style="padding:10px 14px; cursor:pointer;">Generate</button>
+    <div class="grid">
+
+      <!-- INPUT PANEL -->
+      <div class="panel">
+        <h3>Input</h3>
+
+        <label>Reference Image</label>
+        <input type="file" id="imageInput" accept="image/*" />
+
+        <br><br>
+
+        <label>Prompt</label>
+        <textarea id="prompt">
+create turnaround sheet of this exact character, 5 full-body poses on pure white background
+        </textarea>
+
+        <button onclick="generate()">Generate Image</button>
+
+        <div id="status" class="status"></div>
+      </div>
+
+      <!-- OUTPUT PANEL -->
+      <div class="panel">
+        <h3>Output</h3>
+
+        <div id="output" class="output-box">
+          Output image will appear here
+        </div>
+      </div>
+
+    </div>
   </div>
-
-  <pre id="status" style="white-space: pre-wrap; margin-top:16px;"></pre>
 
   <script>
     async function generate() {
-      const prompt = document.getElementById("prompt").value;
-      document.getElementById("status").textContent = "Sending request...";
+      const status = document.getElementById("status");
+      const output = document.getElementById("output");
+
+      status.textContent = "Starting generation...";
+      output.innerHTML = "Generating...";
 
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({
+          prompt: document.getElementById("prompt").value
+        })
       });
 
-      const data = await res.json();
-      document.getElementById("status").textContent = JSON.stringify(data, null, 2);
-    }
-  </script>
-</body>
-</html>
+      const data = await res.j
