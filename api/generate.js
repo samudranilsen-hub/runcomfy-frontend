@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     }
 
     const response = await fetch(
-      "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1/publishers/google/models/imagegeneration@001:predict?key=" +
+      "https://us-central1-aiplatform.googleapis.com/v1/projects/gen-lang-client-0500086483/locations/us-central1/publishers/google/models/imagegeneration@001:predict?key=" +
       process.env.GOOGLE_API_KEY,
       {
         method: "POST",
