@@ -1,25 +1,116 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>RunComfy Test</title>
+  <meta charset="UTF-8" />
+  <title>RunComfy Character Sheet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif; background:#0b0b0b; color:#fff; }
+    .app { max-width:1000px; margin:0 auto; padding:24px; }
+    header { font-size:22px; font-weight:600; margin-bottom:24px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .panel { background:#151515; border:1px solid #262626; border-radius:12px; padding:16px; }
+    .panel h3 { margin:0 0 12px; font-size:16px; font-weight:500; }
+    textarea { width:100%; min-height:120px; background:#0b0b0b; border:1px solid #333; border-radius:8px; color:#fff; padding:10px; resize:vertical; }
+    button { margin-top:16px; width:100%; padding:12px; background:#4f46e5; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; }
+    button:hover { background:#4338ca; }
+    .output-box { min-height:360px; display:flex; align-items:center; justify-content:center; border:1px dashed #333; border-radius:10px; color:#777; text-align:center; overflow:hidden; }
+    .output-box img { max-width:100%; border-radius:8px; }
+    .status { margin-top:12px; font-size:12px; color:#aaa; white-space:pre-wrap; max-height:180px; overflow:auto; }
+    @media (max-width:800px){ .grid{ grid-template-columns:1fr; } }
+  </style>
 </head>
-<body style="font-family:sans-serif; max-width:600px; margin:40px auto;">
-  <h2>Frontend ↔ Backend Test</h2>
 
-  <button onclick="test()">Call Backend</button>
+<body>
+  <div class="app">
+    <header>RunComfy · Character Sheet Generator</header>
 
-  <pre id="output" style="margin-top:20px;"></pre>
+    <div class="grid">
+      <div class="panel">
+        <h3>Input</h3>
+
+        <label>Prompt</label>
+        <textarea id="prompt">create turnaround sheet of this exact character, 5 full-body poses on pure white background</textarea>
+
+        <button id="btn" onclick="generate()">Generate Image</button>
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Output</h3>
+        <div id="output" class="output-box">Generated image will appear here</div>
+      </div>
+    </div>
+  </div>
 
   <script>
-    async function test() {
-      document.getElementById("output").textContent = "Calling backend...";
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-      const res = await fetch("/api/generate");
-      const data = await res.json();
+    function findFirstImageUrl(resultJson) {
+      // Per RunComfy result example: outputs -> nodeId -> images -> [{ url }]
+      const outputs = resultJson?.outputs || {};
+      for (const nodeId of Object.keys(outputs)) {
+        const images = outputs?.[nodeId]?.images;
+        if (Array.isArray(images) && images.length && images[0]?.url) return images[0].url;
+      }
+      return null;
+    }
 
-      document.getElementById("output").textContent =
-        JSON.stringify(data, null, 2);
+    async function generate() {
+      const btn = document.getElementById("btn");
+      const statusEl = document.getElementById("status");
+      const outputEl = document.getElementById("output");
+
+      btn.disabled = true;
+      statusEl.textContent = "Starting generation...";
+      outputEl.textContent = "Working...";
+
+      try {
+        // 1) Submit request
+        const startRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: document.getElementById("prompt").value })
+        });
+        const startData = await startRes.json();
+        statusEl.textContent = JSON.stringify(startData, null, 2);
+
+        const requestId = startData.request_id;
+        if (!requestId) {
+          outputEl.textContent = "No request_id returned. Check status panel.";
+          return;
+        }
+
+        // 2) Poll status
+        while (true) {
+          await sleep(2500);
+          const sRes = await fetch(`/api/status?requestId=${encodeURIComponent(requestId)}`);
+          const sData = await sRes.json();
+          statusEl.textContent = JSON.stringify(sData, null, 2);
+
+          const st = sData.status;
+          if (st === "completed") break;
+          if (st === "cancelled") { outputEl.textContent = "Cancelled."; return; }
+          // keeps polling for in_queue / in_progress
+        }
+
+        // 3) Fetch result
+        const rRes = await fetch(`/api/result?requestId=${encodeURIComponent(requestId)}`);
+        const rData = await rRes.json();
+        statusEl.textContent = JSON.stringify(rData, null, 2);
+
+        const url = findFirstImageUrl(rData);
+        if (url) {
+          outputEl.innerHTML = `<img src="${url}" alt="Generated output" />`;
+        } else {
+          outputEl.textContent = "Completed, but no image URL found in result.";
+        }
+      } catch (e) {
+        statusEl.textContent = "Error: " + String(e);
+        outputEl.textContent = "Something failed. See status.";
+      } finally {
+        btn.disabled = false;
+      }
     }
   </script>
 </body>
