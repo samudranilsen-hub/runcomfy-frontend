@@ -1,211 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>RunComfy Character Sheet Generator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0b0b0b;
-      color: #ffffff;
-    }
-
-    .app {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    header {
-      font-size: 22px;
-      font-weight: 600;
-      margin-bottom: 24px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .panel {
-      background: #151515;
-      border: 1px solid #262626;
-      border-radius: 12px;
-      padding: 16px;
-    }
-
-    .panel h3 {
-      margin: 0 0 12px;
-      font-size: 16px;
-      font-weight: 500;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 120px;
-      background: #0b0b0b;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #fff;
-      padding: 10px;
-      resize: vertical;
-    }
-
-    input[type="file"] {
-      color: #ccc;
-      margin-top: 8px;
-    }
-
-    button {
-      margin-top: 16px;
-      width: 100%;
-      padding: 12px;
-      background: #4f46e5;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #4338ca;
-    }
-
-    .output-box {
-      min-height: 360px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px dashed #333;
-      border-radius: 10px;
-      color: #777;
-      text-align: center;
-      overflow: hidden;
-    }
-
-    .output-box img {
-      max-width: 100%;
-      border-radius: 8px;
-    }
-
-    .status {
-      margin-top: 12px;
-      font-size: 12px;
-      color: #aaa;
-      white-space: pre-wrap;
-      max-height: 160px;
-      overflow-y: auto;
-    }
-
-    @media (max-width: 800px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+  <meta charset="utf-8" />
+  <title>RunComfy Test</title>
 </head>
+<body style="font-family:sans-serif; max-width:600px; margin:40px auto;">
+  <h2>Frontend ↔ Backend Test</h2>
 
-<body>
-  <div class="app">
-    <header>RunComfy · Character Sheet Generator</header>
+  <button onclick="test()">Call Backend</button>
 
-    <div class="grid">
-
-      <!-- INPUT PANEL -->
-      <div class="panel">
-        <h3>Input</h3>
-
-        <label>Reference Image (UI only for now)</label>
-        <input type="file" disabled />
-
-        <br><br>
-
-        <label>Prompt</label>
-        <textarea id="prompt">
-create turnaround sheet of this exact character, 5 full-body poses on pure white background
-        </textarea>
-
-        <button onclick="generate()">Generate Image</button>
-
-        <div id="status" class="status"></div>
-      </div>
-
-      <!-- OUTPUT PANEL -->
-      <div class="panel">
-        <h3>Output</h3>
-
-        <div id="output" class="output-box">
-          Generated image will appear here
-        </div>
-      </div>
-
-    </div>
-  </div>
+  <pre id="output" style="margin-top:20px;"></pre>
 
   <script>
-    async function generate() {
-      const statusEl = document.getElementById("status");
-      const outputEl = document.getElementById("output");
+    async function test() {
+      document.getElementById("output").textContent = "Calling backend...";
 
-      statusEl.textContent = "Starting generation...";
-      outputEl.innerHTML = "Generating...";
+      const res = await fetch("/api/generate");
+      const data = await res.json();
 
-      // 1️⃣ Start RunComfy job
-      const startRes = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: document.getElementById("prompt").value
-        })
-      });
-
-      const startData = await startRes.json();
-      const jobId = startData.job_id || startData.id;
-
-      if (!jobId) {
-        statusEl.textContent = "Failed to start job.";
-        outputEl.innerHTML = "Error starting generation.";
-        return;
-      }
-
-      statusEl.textContent = `Job started: ${jobId}`;
-
-      // 2️⃣ Poll job status
-      while (true) {
-        await new Promise(r => setTimeout(r, 3000));
-
-        const statusRes = await fetch(`/api/status?jobId=${jobId}`);
-        const data = await statusRes.json();
-
-        statusEl.textContent = JSON.stringify(data, null, 2);
-
-        const state = data.status || data.state;
-
-        if (state === "completed") {
-          // 3️⃣ Extract output image
-          const images =
-            data.output?.images ||
-            data.outputs?.images ||
-            [];
-
-          if (images.length > 0 && images[0].url) {
-            outputEl.innerHTML = `<img src="${images[0].url}" />`;
-          } else {
-            outputEl.innerHTML = "Job completed, but no image found.";
-          }
-          break;
-        }
-
-        if (state === "failed") {
-          outputEl.innerHTML = "Generation failed.";
-          break;
-        }
-      }
+      document.getElementById("output").textContent =
+        JSON.stringify(data, null, 2);
     }
   </script>
 </body>
