@@ -1,3 +1,3 @@
 export default function handler(req, res) {
-  res.status(200).json({ status: "completed" });
+  res.status(200).json({ status: "done" });
 }
