@@ -2,172 +2,107 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>RunComfy Character Sheet Generator</title>
+  <title>RunComfy Generator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0b0b0b;
-      color: #ffffff;
-    }
-    .app {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-    header {
-      font-size: 22px;
-      font-weight: 600;
-      margin-bottom: 24px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    .panel {
-      background: #151515;
-      border: 1px solid #262626;
-      border-radius: 12px;
-      padding: 16px;
-    }
-    textarea {
-      width: 100%;
-      min-height: 120px;
-      background: #0b0b0b;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #fff;
-      padding: 10px;
-    }
-    input[type="file"] {
-      margin-top: 8px;
-      color: #ccc;
-    }
-    button {
-      margin-top: 16px;
-      width: 100%;
-      padding: 12px;
-      background: #4f46e5;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    .output-box {
-      min-height: 360px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px dashed #333;
-      border-radius: 10px;
-      color: #777;
-    }
-    .output-box img {
-      max-width: 100%;
-      border-radius: 8px;
-    }
-    .status {
-      margin-top: 12px;
-      font-size: 12px;
-      color: #aaa;
-      white-space: pre-wrap;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    @media (max-width: 800px) {
-      .grid { grid-template-columns: 1fr; }
-    }
+    body { margin:0; padding:0; background:#111; color:#fff; font-family:sans-serif; }
+    .container { max-width:900px; margin:auto; padding:24px; }
+    .panel { background:#222; padding:20px; border-radius:10px; margin-bottom:20px; }
+    textarea { width:100%; height:120px; background:#000; color:#fff; padding:10px; border-radius:8px; border:1px solid #333; }
+    input[type="file"] { margin-top:10px; }
+    button { margin-top:15px; width:100%; padding:12px; background:#4f46e5; border:none; border-radius:8px; color:#fff; cursor:pointer; }
+    .output img { max-width:100%; border-radius:8px; margin-top:15px; }
+    pre { white-space:pre-wrap; background:#000; padding:10px; border-radius:8px; max-height:200px; overflow-y:auto; }
   </style>
 </head>
 
 <body>
-  <div class="app">
-    <header>RunComfy · Character Sheet Generator</header>
+  <div class="container">
+    <h1>RunComfy · Image Workflow Generator</h1>
 
-    <div class="grid">
-      <div class="panel">
-        <label>Reference Image</label>
-        <input type="file" id="imageInput" accept="image/*" />
+    <div class="panel">
+      <label>Upload reference image</label>
+      <input type="file" id="imageInput" accept="image/*">
 
-        <br><br>
+      <label>Prompt</label>
+      <textarea id="prompt">
+create turnaround sheet of this character
+      </textarea>
 
-        <label>Prompt</label>
-        <textarea id="prompt">create turnaround sheet of this exact character</textarea>
+      <button onclick="start()">Generate</button>
 
-        <button onclick="generate()">Generate Image</button>
-        <div id="status" class="status"></div>
-      </div>
+      <pre id="status"></pre>
+    </div>
 
-      <div class="panel">
-        <div id="output" class="output-box">
-          Generated image will appear here
-        </div>
-      </div>
+    <div class="panel output" id="output">
+      Output will appear here
     </div>
   </div>
 
 <script>
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function toBase64(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.readAsDataURL(file);
+  });
+}
 
-async function generate() {
-  const statusEl = document.getElementById("status");
-  const outputEl = document.getElementById("output");
+async function start() {
+  const status = document.getElementById("status");
+  const output = document.getElementById("output");
   const file = document.getElementById("imageInput").files[0];
+  const prompt = document.getElementById("prompt").value;
 
-  if (!file) {
-    statusEl.textContent = "Please select an image.";
-    return;
-  }
+  if (!file) { status.textContent = "Please select an image."; return; }
 
-  statusEl.textContent = "Uploading image & starting job...";
-  outputEl.textContent = "Working...";
+  status.textContent = "Converting image...";
+  const imageB64 = await toBase64(file);
 
-  const formData = new FormData();
-  formData.append("image", file);
-  formData.append("prompt", document.getElementById("prompt").value);
+  status.textContent = "Sending job to RunComfy...";
 
-  const startRes = await fetch("/api/generate", {
-    method: "POST",
-    body: formData
+  const res = await fetch("/api/generate", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ prompt, image: imageB64 })
   });
 
-  const startData = await startRes.json();
-  statusEl.textContent = JSON.stringify(startData, null, 2);
+  const data = await res.json();
+  status.textContent = JSON.stringify(data, null, 2);
 
-  const requestId = startData.request_id;
-  if (!requestId) return;
+  if (!data.request_id) return;
 
-  // Poll status
-  while (true) {
-    await sleep(3000);
-    const sRes = await fetch(`/api/status?requestId=${requestId}`);
-    const sData = await sRes.json();
-    statusEl.textContent = JSON.stringify(sData, null, 2);
+  // poll status
+  let done = false;
+  while (!done) {
+    await new Promise(r => setTimeout(r, 2500));
 
-    if (sData.status === "completed") break;
-    if (sData.status === "failed") {
-      outputEl.textContent = "Generation failed.";
-      return;
+    const s = await fetch("/api/status?requestId=" + data.request_id);
+    const js = await s.json();
+    status.textContent = JSON.stringify(js, null, 2);
+
+    if (js.status === "completed") {
+      done = true;
     }
   }
 
-  // Fetch result
-  const rRes = await fetch(`/api/result?requestId=${requestId}`);
-  const rData = await rRes.json();
-  statusEl.textContent = JSON.stringify(rData, null, 2);
+  const r = await fetch("/api/result?requestId=" + data.request_id);
+  const rj = await r.json();
 
-  for (const node of Object.values(rData.outputs || {})) {
+  status.textContent = JSON.stringify(rj, null, 2);
+
+  // find first image
+  for (const node of Object.values(rj.outputs || {})) {
     if (node.images?.length) {
-      outputEl.innerHTML = `<img src="${node.images[0].url}" />`;
+      output.innerHTML = `<img src="${node.images[0].url}" />`;
       return;
     }
   }
 
-  outputEl.textContent = "No image found.";
+  output.textContent = "No image found in results.";
 }
 </script>
+
 </body>
 </html>
