@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>RunComfy Character Sheet</title>
+  <title>RunComfy Character Sheet Generator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
@@ -77,8 +77,7 @@
     }
 
     .output-box {
-      height: 100%;
-      min-height: 320px;
+      min-height: 360px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -86,6 +85,7 @@
       border-radius: 10px;
       color: #777;
       text-align: center;
+      overflow: hidden;
     }
 
     .output-box img {
@@ -98,6 +98,8 @@
       font-size: 12px;
       color: #aaa;
       white-space: pre-wrap;
+      max-height: 160px;
+      overflow-y: auto;
     }
 
     @media (max-width: 800px) {
@@ -118,8 +120,8 @@
       <div class="panel">
         <h3>Input</h3>
 
-        <label>Reference Image</label>
-        <input type="file" id="imageInput" accept="image/*" />
+        <label>Reference Image (UI only for now)</label>
+        <input type="file" disabled />
 
         <br><br>
 
@@ -138,7 +140,7 @@ create turnaround sheet of this exact character, 5 full-body poses on pure white
         <h3>Output</h3>
 
         <div id="output" class="output-box">
-          Output image will appear here
+          Generated image will appear here
         </div>
       </div>
 
@@ -147,13 +149,14 @@ create turnaround sheet of this exact character, 5 full-body poses on pure white
 
   <script>
     async function generate() {
-      const status = document.getElementById("status");
-      const output = document.getElementById("output");
+      const statusEl = document.getElementById("status");
+      const outputEl = document.getElementById("output");
 
-      status.textContent = "Starting generation...";
-      output.innerHTML = "Generating...";
+      statusEl.textContent = "Starting generation...";
+      outputEl.innerHTML = "Generating...";
 
-      const res = await fetch("/api/generate", {
+      // 1️⃣ Start RunComfy job
+      const startRes = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -161,4 +164,49 @@ create turnaround sheet of this exact character, 5 full-body poses on pure white
         })
       });
 
-      const data = await res.j
+      const startData = await startRes.json();
+      const jobId = startData.job_id || startData.id;
+
+      if (!jobId) {
+        statusEl.textContent = "Failed to start job.";
+        outputEl.innerHTML = "Error starting generation.";
+        return;
+      }
+
+      statusEl.textContent = `Job started: ${jobId}`;
+
+      // 2️⃣ Poll job status
+      while (true) {
+        await new Promise(r => setTimeout(r, 3000));
+
+        const statusRes = await fetch(`/api/status?jobId=${jobId}`);
+        const data = await statusRes.json();
+
+        statusEl.textContent = JSON.stringify(data, null, 2);
+
+        const state = data.status || data.state;
+
+        if (state === "completed") {
+          // 3️⃣ Extract output image
+          const images =
+            data.output?.images ||
+            data.outputs?.images ||
+            [];
+
+          if (images.length > 0 && images[0].url) {
+            outputEl.innerHTML = `<img src="${images[0].url}" />`;
+          } else {
+            outputEl.innerHTML = "Job completed, but no image found.";
+          }
+          break;
+        }
+
+        if (state === "failed") {
+          outputEl.innerHTML = "Generation failed.";
+          break;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
