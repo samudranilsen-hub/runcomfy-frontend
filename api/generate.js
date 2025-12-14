@@ -1,40 +1,47 @@
+export const config = {
+  api: { bodyParser: false }
+};
+
+import { v4 as uuid } from "uuid";
+
 export default async function handler(req, res) {
   try {
-    const { prompt, image } = req.body;
+    const form = await req.formData();
+    const file = form.get("image");
+    const prompt = form.get("prompt");
 
-    if (!prompt || !image) {
+    if (!file || !prompt) {
       return res.status(400).json({ error: "Missing prompt or image" });
     }
 
-    const workflow = {
-      overrides: {
-        "6": { inputs: { text: prompt } },
+    const bytes = await file.arrayBuffer();
+    const base64Image = Buffer.from(bytes).toString("base64");
 
-        // Your LoadImage node (194)
-        "194": {
-          inputs: {
-            image: `data:image/png;base64,${image}`
-          }
-        }
-      }
-    };
-
-    const resp = await fetch(
-      "https://api.runcomfy.net/prod/v1/deployments/c9067009-10ce-4f43-b977-79ff5dc30337/inference",
+    const response = await fetch(
+      "https://us-central1-aiplatform.googleapis.com/v1/projects/gen-lang-client-0500086483/locations/us-central1/publishers/google/models/imagegeneration:predict?key=" +
+      process.env.GOOGLE_API_KEY,
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.RUNCOMFY_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(workflow)
+        body: JSON.stringify({
+          instances: [
+            {
+              prompt: prompt,
+              image: {
+                bytesBase64Encoded: base64Image
+              }
+            }
+          ]
+        })
       }
     );
 
-    const data = await resp.json();
+    const data = await response.json();
     res.status(200).json(data);
 
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
+  } catch (err) {
+    res.status(500).json({ error: err.toString() });
   }
 }
